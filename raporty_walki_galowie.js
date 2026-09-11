@@ -1,106 +1,37 @@
 (function () {
     'use strict';
 
-    /* =========================================================
-       GALOWIE – RAPORTY WALKI
-       ATAK / OBRONA
-       AUTOMATYCZNY ZAPIS NOTATKI
-       ========================================================= */
+    /*
+     * GALOWIE – RAPORTY WALKI
+     *
+     * - ATAK / OBRONA
+     * - 4 człony Galów
+     * - tylko dane przeciwnika
+     * - bez łupu
+     * - zachowuje starą notatkę
+     * - usuwa przypadkowo wklejony JS ze starej notatki
+     * - zapisuje report_export tylko raz dla danego raportu
+     * - automatyczny zapis do wioski przeciwnika
+     * - krótkie powiadomienie po zapisie
+     */
 
-
-    /* =========================================================
-       CZŁONY GALÓW
-       ========================================================= */
-
-    const GALOWIE = [
-        ':G:',
-        ';G;',
-        '~G~',
-        '-G-'
-    ];
-
-
-    /* =========================================================
-       JEDNOSTKI
-       ========================================================= */
+    const GALOWIE = [':G:', ';G;', '~G~', '-G-'];
 
     const UNITS = [
-        {
-            key: 'spear',
-            name: 'Pikinier',
-            aliases: ['spear', 'pikinier']
-        },
-        {
-            key: 'sword',
-            name: 'Miecznik',
-            aliases: ['sword', 'miecznik']
-        },
-        {
-            key: 'axe',
-            name: 'Topornik',
-            aliases: ['axe', 'topornik']
-        },
-        {
-            key: 'spy',
-            name: 'Zwiadowca',
-            aliases: ['spy', 'zwiadowca']
-        },
-        {
-            key: 'light',
-            name: 'Lekki kawalerzysta',
-            aliases: [
-                'light',
-                'lekki',
-                'light_cavalry'
-            ]
-        },
-        {
-            key: 'heavy',
-            name: 'Ciężki kawalerzysta',
-            aliases: [
-                'heavy',
-                'ciężki',
-                'heavy_cavalry'
-            ]
-        },
-        {
-            key: 'ram',
-            name: 'Taran',
-            aliases: [
-                'ram',
-                'taran'
-            ]
-        },
-        {
-            key: 'catapult',
-            name: 'Katapulta',
-            aliases: [
-                'catapult',
-                'katapulta'
-            ]
-        },
-        {
-            key: 'snob',
-            name: 'Szlachcic',
-            aliases: [
-                'snob',
-                'szlachcic',
-                'noble'
-            ]
-        }
+        { key: 'spear',    name: 'Pikinier',            aliases: ['spear', 'pikinier'] },
+        { key: 'sword',    name: 'Miecznik',            aliases: ['sword', 'miecznik'] },
+        { key: 'axe',      name: 'Topornik',            aliases: ['axe', 'topornik'] },
+        { key: 'spy',      name: 'Zwiadowca',           aliases: ['spy', 'zwiadowca'] },
+        { key: 'light',    name: 'Lekki kawalerzysta',  aliases: ['light', 'lekki', 'light_cavalry'] },
+        { key: 'heavy',    name: 'Ciężki kawalerzysta', aliases: ['heavy', 'ciężki', 'heavy_cavalry'] },
+        { key: 'ram',      name: 'Taran',               aliases: ['ram', 'taran'] },
+        { key: 'catapult', name: 'Katapulta',           aliases: ['catapult', 'katapulta'] },
+        { key: 'snob',     name: 'Szlachcic',           aliases: ['snob', 'szlachcic', 'noble'] }
     ];
 
-
-    /* =========================================================
-       FUNKCJE POMOCNICZE
-       ========================================================= */
-
     function cleanText(text) {
-        return (text || '')
-            .replace(/\s+/g, ' ')
-            .trim();
+        return String(text || '').replace(/\s+/g, ' ').trim();
     }
-
 
     function normalize(text) {
         return cleanText(text)
@@ -109,28 +40,15 @@
             .replace(/[\u0300-\u036f]/g, '');
     }
 
-
     function numberFromText(text) {
+        const m = String(text || '')
+            .replace(/\s/g, '')
+            .match(/-?\d[\d.]*/);
 
-        if (!text) {
-            return 0;
-        }
-
-        const match =
-            String(text)
-                .replace(/\s/g, '')
-                .match(/-?\d[\d.]*/);
-
-        if (!match) {
-            return 0;
-        }
-
-        return parseInt(
-            match[0].replace(/\./g, ''),
-            10
-        ) || 0;
+        return m
+            ? (parseInt(m[0].replace(/\./g, ''), 10) || 0)
+            : 0;
     }
-
 
     function escapeHtml(text) {
         return String(text || '')
@@ -140,106 +58,44 @@
             .replace(/"/g, '&quot;');
     }
 
-
-    function getGameData() {
+    function gameData() {
         return window.game_data || {};
     }
 
-
-    /* =========================================================
-       CZY PLEMIĘ NALEŻY DO GALÓW
-       ========================================================= */
-
     function isGal(tribe) {
-
-        if (!tribe) {
-            return false;
-        }
-
-        const text =
-            cleanText(tribe);
-
-        return GALOWIE.some(
-            tag => text.includes(tag)
-        );
+        const t = cleanText(tribe);
+        return !!t && GALOWIE.some(tag => t.includes(tag));
     }
-
-
-    /* =========================================================
-       SZUKANIE AGRESORA / OBROŃCY
-       ========================================================= */
 
     function findSide(label) {
+        const elements = Array.from(document.querySelectorAll('*'));
 
-        const elements =
-            Array.from(
-                document.querySelectorAll('*')
-            );
+        for (const el of elements) {
+            const text = cleanText(el.textContent);
 
-        for (const element of elements) {
-
-            const text =
-                cleanText(
-                    element.textContent
-                );
-
-            if (
-                text === label ||
-                text.startsWith(label)
-            ) {
-                return element;
+            if (text === label || text.startsWith(label)) {
+                return el;
             }
         }
 
         return null;
     }
-
-
-    /* =========================================================
-       GRACZ
-       ========================================================= */
 
     function findPlayerLink(container) {
+        if (!container) return null;
 
-        if (!container) {
-            return null;
-        }
+        return Array.from(
+            container.querySelectorAll('a')
+        ).find(a => {
+            const href = a.getAttribute('href') || '';
 
-        const links =
-            Array.from(
-                container.querySelectorAll('a')
-            );
-
-        for (const link of links) {
-
-            const href =
-                link.getAttribute('href') || '';
-
-            if (
-                href.includes(
-                    'screen=info_player'
-                ) &&
-                href.includes('id=')
-            ) {
-                return link;
-            }
-        }
-
-        return null;
+            return href.includes('screen=info_player') &&
+                   href.includes('id=');
+        }) || null;
     }
 
-
     function extractPlayer(side) {
-
-        if (!side) {
-            return {
-                name: '',
-                id: null
-            };
-        }
-
-        const link =
-            findPlayerLink(side);
+        const link = findPlayerLink(side);
 
         if (!link) {
             return {
@@ -248,34 +104,16 @@
             };
         }
 
-        const href =
-            link.getAttribute('href') || '';
-
-        const match =
-            href.match(
-                /[?&]id=(\d+)/
-            );
+        const href = link.getAttribute('href') || '';
+        const m = href.match(/[?&]id=(\d+)/);
 
         return {
-            name:
-                cleanText(
-                    link.textContent
-                ),
-
-            id:
-                match
-                    ? match[1]
-                    : null
+            name: cleanText(link.textContent),
+            id: m ? m[1] : null
         };
     }
 
-
-    /* =========================================================
-       WIOSKA
-       ========================================================= */
-
     function extractVillage(side) {
-
         const result = {
             id: null,
             name: '',
@@ -283,1454 +121,622 @@
             continent: ''
         };
 
-        if (!side) {
-            return result;
-        }
+        if (!side) return result;
 
-
-        const links =
-            Array.from(
-                side.querySelectorAll(
-                    'a[href*="screen=info_village"]'
-                )
-            );
-
+        const links = Array.from(
+            side.querySelectorAll('a[href*="screen=info_village"]')
+        );
 
         for (const link of links) {
+            const href = link.getAttribute('href') || '';
+            const text = cleanText(link.textContent);
 
-            const href =
-                link.getAttribute('href') || '';
+            const id = href.match(/[?&]id=(\d+)/);
+            const coords = text.match(/(\d{1,3}\|\d{1,3})/);
+            const k = text.match(/K\d+/i);
 
-            const text =
-                cleanText(
-                    link.textContent
-                );
+            if (id) result.id = id[1];
+            if (text) result.name = text;
+            if (coords) result.coords = coords[1];
+            if (k) result.continent = k[0];
 
-
-            const idMatch =
-                href.match(
-                    /[?&]id=(\d+)/
-                );
-
-
-            const coordMatch =
-                text.match(
-                    /(\d{1,3}\|\d{1,3})/
-                );
-
-
-            if (idMatch) {
-                result.id =
-                    idMatch[1];
-            }
-
-
-            if (text) {
-                result.name =
-                    text;
-            }
-
-
-            if (coordMatch) {
-                result.coords =
-                    coordMatch[1];
-            }
-
-
-            const continent =
-                text.match(
-                    /K\d+/i
-                );
-
-
-            if (continent) {
-                result.continent =
-                    continent[0];
-            }
-
-
-            if (result.id) {
-                break;
-            }
+            if (result.id) break;
         }
 
-
-        /*
-         * Fallback – wszystkie linki do wiosek
-         */
-
         if (!result.id) {
+            for (const link of document.querySelectorAll(
+                'a[href*="screen=info_village"]'
+            )) {
+                const href = link.getAttribute('href') || '';
+                const text = cleanText(link.textContent);
 
-            const links =
-                Array.from(
-                    document.querySelectorAll(
-                        'a[href*="screen=info_village"]'
-                    )
-                );
+                const id = href.match(/[?&]id=(\d+)/);
+                const coords = text.match(/(\d{1,3}\|\d{1,3})/);
 
+                if (id && coords) {
+                    result.id = id[1];
+                    result.name = text;
+                    result.coords = coords[1];
 
-            for (const link of links) {
-
-                const href =
-                    link.getAttribute('href') || '';
-
-                const text =
-                    cleanText(
-                        link.textContent
-                    );
-
-
-                const idMatch =
-                    href.match(
-                        /[?&]id=(\d+)/
-                    );
-
-
-                const coordMatch =
-                    text.match(
-                        /(\d{1,3}\|\d{1,3})/
-                    );
-
-
-                if (
-                    idMatch &&
-                    coordMatch
-                ) {
-
-                    result.id =
-                        idMatch[1];
-
-                    result.name =
-                        text;
-
-                    result.coords =
-                        coordMatch[1];
-
-
-                    const continent =
-                        text.match(
-                            /K\d+/i
-                        );
-
-
-                    if (continent) {
-                        result.continent =
-                            continent[0];
-                    }
-
+                    const k = text.match(/K\d+/i);
+                    if (k) result.continent = k[0];
 
                     break;
                 }
             }
         }
 
-
-        /*
-         * Ostateczny fallback – współrzędne
-         */
-
         if (!result.coords) {
+            const m = cleanText(side.textContent)
+                .match(/(\d{1,3}\|\d{1,3})/);
 
-            const text =
-                cleanText(
-                    side.textContent
-                );
-
-
-            const match =
-                text.match(
-                    /(\d{1,3}\|\d{1,3})/
-                );
-
-
-            if (match) {
-                result.coords =
-                    match[1];
-            }
+            if (m) result.coords = m[1];
         }
-
 
         return result;
     }
 
-
-    /* =========================================================
-       DATA ATAKU
-       CZYLI CZAS BITWY
-       ========================================================= */
-
     function getAttackDate() {
-
-        /*
-         * Szukamy konkretnego wiersza:
-         *
-         * Czas bitwy | 10.09.26 19:29:44:340
-         */
-
-        const rows =
-            Array.from(
-                document.querySelectorAll('tr')
+        for (const row of document.querySelectorAll('tr')) {
+            const cells = Array.from(
+                row.querySelectorAll('td, th')
             );
 
+            if (cells.length < 2) continue;
 
-        for (const row of rows) {
-
-            const cells =
-                Array.from(
-                    row.querySelectorAll(
-                        'td, th'
-                    )
-                );
-
-
-            if (cells.length < 2) {
-                continue;
-            }
-
-
-            const label =
-                normalize(
-                    cells[0].textContent
-                );
-
-
-            if (
-                label === 'czas bitwy'
-            ) {
-
-                let value =
-                    cleanText(
-                        cells[1].textContent
-                    );
-
-
-                /*
-                 * Usuwamy milisekundy:
-                 *
-                 * 10.09.26 19:29:44:340
-                 *
-                 * →
-                 *
-                 * 10.09.26 19:29:44
-                 */
-
-                value =
-                    value.replace(
+            if (normalize(cells[0].textContent) === 'czas bitwy') {
+                return cleanText(cells[1].textContent)
+                    .replace(
                         /(\d{2}:\d{2}:\d{2}):\d+$/,
                         '$1'
                     );
-
-
-                return value;
             }
         }
 
-
-        /*
-         * Drugi sposób – wyszukanie elementu
-         * "Czas bitwy" i jego sąsiada.
-         */
-
-        const elements =
-            Array.from(
-                document.querySelectorAll('*')
-            );
-
-
-        for (const element of elements) {
-
-            if (
-                cleanText(
-                    element.textContent
-                ) !== 'Czas bitwy'
-            ) {
+        for (const el of document.querySelectorAll('*')) {
+            if (cleanText(el.textContent) !== 'Czas bitwy') {
                 continue;
             }
 
+            const next = el.nextElementSibling;
 
-            const next =
-                element.nextElementSibling;
-
-
-            if (!next) {
-                continue;
-            }
-
-
-            let value =
-                cleanText(
-                    next.textContent
-                );
-
-
-            value =
-                value.replace(
-                    /(\d{2}:\d{2}:\d{2}):\d+$/,
-                    '$1'
-                );
-
-
-            if (value) {
-                return value;
+            if (next) {
+                return cleanText(next.textContent)
+                    .replace(
+                        /(\d{2}:\d{2}:\d{2}):\d+$/,
+                        '$1'
+                    );
             }
         }
-
 
         return 'brak danych';
     }
 
-
-    /* =========================================================
-       JEDNOSTKA Z IKONY
-       ========================================================= */
-
     function unitFromImage(img) {
+        if (!img) return null;
 
-        if (!img) {
-            return null;
-        }
-
-
-        const values = [
-
+        const text = normalize([
             img.getAttribute('src') || '',
-
             img.getAttribute('title') || '',
-
             img.getAttribute('alt') || '',
-
             img.getAttribute('data-unit') || '',
-
             img.getAttribute('class') || ''
+        ].join(' '));
 
-        ];
-
-
-        const text =
-            normalize(
-                values.join(' ')
-            );
-
-
-        for (const unit of UNITS) {
-
-            for (const alias of unit.aliases) {
-
-                if (
-                    text.includes(
-                        normalize(alias)
-                    )
-                ) {
-                    return unit;
-                }
-            }
-        }
-
-
-        return null;
+        return UNITS.find(unit =>
+            unit.aliases.some(alias =>
+                text.includes(normalize(alias))
+            )
+        ) || null;
     }
 
-
-    /* =========================================================
-       LICZBY Z WIERSZA
-       ========================================================= */
-
     function getRowNumbers(row) {
-
-        if (!row) {
-            return [];
-        }
-
-
-        const cells =
-            Array.from(
-                row.querySelectorAll(
-                    'td, th'
-                )
-            );
-
+        if (!row) return [];
 
         const values = [];
 
+        for (const cell of row.querySelectorAll('td, th')) {
+            const text = cleanText(cell.textContent);
 
-        for (const cell of cells) {
-
-            const text =
-                cleanText(
-                    cell.textContent
-                );
-
-
-            if (
-                /^\d[\d\s.]*$/.test(text)
-            ) {
-
-                values.push(
-                    numberFromText(text)
-                );
+            if (/^\d[\d\s.]*$/.test(text)) {
+                values.push(numberFromText(text));
             }
         }
 
+        if (values.length) return values;
 
-        if (values.length) {
-            return values;
-        }
-
-
-        const text =
-            cleanText(
-                row.textContent
-            );
-
-
-        const matches =
-            text.match(
-                /\d[\d\s.]*/g
-            ) || [];
-
-
-        return matches.map(
-            numberFromText
-        );
+        return (
+            cleanText(row.textContent)
+                .match(/\d[\d\s.]*/g) || []
+        ).map(numberFromText);
     }
 
-
-    /* =========================================================
-       PUSTA TABELA WOJSKA
-       ========================================================= */
-
-    function createEmptyTroops() {
-
+    function emptyTroops() {
         const result = {};
 
-
         UNITS.forEach(unit => {
-
             result[unit.key] = {
-
-                name:
-                    unit.name,
-
-                amount:
-                    0,
-
-                losses:
-                    0,
-
-                remaining:
-                    0
+                name: unit.name,
+                amount: 0,
+                losses: 0,
+                remaining: 0
             };
         });
 
-
         return result;
     }
 
-
-    /* =========================================================
-       ODCZYT WOJSKA
-       ========================================================= */
-
     function readTroops(container) {
+        const result = emptyTroops();
 
-        const result =
-            createEmptyTroops();
+        if (!container) return result;
 
+        for (const table of container.querySelectorAll('table')) {
+            const detected = [];
 
-        if (!container) {
-            return result;
-        }
-
-
-        const tables =
-            Array.from(
-                container.querySelectorAll(
-                    'table'
-                )
-            );
-
-
-        for (const table of tables) {
-
-            const images =
-                Array.from(
-                    table.querySelectorAll(
-                        'img'
-                    )
-                );
-
-
-            const detectedUnits = [];
-
-
-            for (const img of images) {
-
-                const unit =
-                    unitFromImage(img);
-
+            for (const img of table.querySelectorAll('img')) {
+                const unit = unitFromImage(img);
 
                 if (
                     unit &&
-                    !detectedUnits.some(
-                        x =>
-                            x.key ===
-                            unit.key
-                    )
+                    !detected.some(x => x.key === unit.key)
                 ) {
-
-                    detectedUnits.push(
-                        unit
-                    );
+                    detected.push(unit);
                 }
             }
 
+            if (!detected.length) continue;
 
-            if (
-                !detectedUnits.length
-            ) {
-                continue;
-            }
+            let amountRow = null;
+            let lossesRow = null;
 
+            for (const row of table.querySelectorAll('tr')) {
+                const text = normalize(row.textContent);
 
-            const rows =
-                Array.from(
-                    table.querySelectorAll(
-                        'tr'
-                    )
-                );
-
-
-            let amountRow =
-                null;
-
-            let lossesRow =
-                null;
-
-
-            for (const row of rows) {
-
-                const text =
-                    normalize(
-                        row.textContent
-                    );
-
-
-                if (
-                    text.includes('ilosc')
-                ) {
-
-                    amountRow =
-                        row;
+                if (text.includes('ilosc')) {
+                    amountRow = row;
                 }
 
-
-                if (
-                    text.includes('straty')
-                ) {
-
-                    lossesRow =
-                        row;
+                if (text.includes('straty')) {
+                    lossesRow = row;
                 }
             }
 
+            if (!amountRow || !lossesRow) continue;
 
-            if (
-                !amountRow ||
-                !lossesRow
-            ) {
-                continue;
-            }
+            const amounts = getRowNumbers(amountRow);
+            const losses = getRowNumbers(lossesRow);
 
+            detected.forEach((unit, i) => {
+                const amount = amounts[i] || 0;
+                const loss = losses[i] || 0;
 
-            const amounts =
-                getRowNumbers(
-                    amountRow
-                );
-
-
-            const losses =
-                getRowNumbers(
-                    lossesRow
-                );
-
-
-            detectedUnits.forEach(
-                (unit, index) => {
-
-                    const amount =
-                        amounts[index] || 0;
-
-                    const loss =
-                        losses[index] || 0;
-
-
-                    result[
-                        unit.key
-                    ].amount =
-                        amount;
-
-
-                    result[
-                        unit.key
-                    ].losses =
-                        loss;
-
-
-                    result[
-                        unit.key
-                    ].remaining =
-                        Math.max(
-                            0,
-                            amount - loss
-                        );
-                }
-            );
+                result[unit.key].amount = amount;
+                result[unit.key].losses = loss;
+                result[unit.key].remaining =
+                    Math.max(0, amount - loss);
+            });
         }
-
 
         return result;
     }
 
-
-    /* =========================================================
-       PLEMIĘ GRACZA
-       ========================================================= */
-
     async function getPlayerTribe(playerId) {
-
         if (!playerId) {
             return 'bez plemienia';
         }
 
-
         try {
-
-            const url =
+            const response = await fetch(
                 '/game.php?screen=info_player&id=' +
-                encodeURIComponent(
-                    playerId
-                );
-
-
-            const response =
-                await fetch(
-                    url,
-                    {
-                        credentials:
-                            'same-origin'
-                    }
-                );
-
+                encodeURIComponent(playerId),
+                {
+                    credentials: 'same-origin'
+                }
+            );
 
             if (!response.ok) {
                 return 'bez plemienia';
             }
 
+            const html = await response.text();
 
-            const html =
-                await response.text();
+            const doc = new DOMParser()
+                .parseFromString(html, 'text/html');
 
-
-            const parser =
-                new DOMParser();
-
-
-            const doc =
-                parser.parseFromString(
-                    html,
-                    'text/html'
-                );
-
-
-            /*
-             * Szukamy prawdziwego linku plemienia.
-             */
-
-            const allyLink =
-                doc.querySelector(
-                    'a[href*="screen=info_ally"]'
-                );
-
+            const allyLink = doc.querySelector(
+                'a[href*="screen=info_ally"]'
+            );
 
             if (allyLink) {
-
-                const tribe =
-                    cleanText(
-                        allyLink.textContent
-                    );
-
-
-                if (tribe) {
-                    return tribe;
-                }
-            }
-
-
-            /*
-             * Fallback tekstowy.
-             */
-
-            const bodyText =
-                cleanText(
-                    doc.body
-                        ? doc.body.textContent
-                        : ''
+                const tribe = cleanText(
+                    allyLink.textContent
                 );
 
-
-            const match =
-                bodyText.match(
-                    /Plemię:\s*([^\n]+)/i
-                );
-
-
-            if (match) {
-
-                const tribe =
-                    cleanText(
-                        match[1]
-                    );
-
-
-                if (
-                    tribe &&
-                    tribe !== '-'
-                ) {
-                    return tribe;
-                }
+                if (tribe) return tribe;
             }
 
+            const body = cleanText(
+                doc.body ? doc.body.textContent : ''
+            );
 
-            return 'bez plemienia';
+            const m = body.match(
+                /Plemię:\s*([^\n]+)/i
+            );
 
-        } catch (error) {
+            if (
+                m &&
+                cleanText(m[1]) &&
+                cleanText(m[1]) !== '-'
+            ) {
+                return cleanText(m[1]);
+            }
 
+        } catch (e) {
             console.warn(
                 'Nie udało się pobrać plemienia:',
-                error
+                e
             );
-
-
-            return 'bez plemienia';
         }
+
+        return 'bez plemienia';
     }
-
-
-    /* =========================================================
-       ŁUP
-       ========================================================= */
-
-    function getLoot() {
-
-        /*
-         * Najpierw próbujemy znaleźć dokładny
-         * wiersz z "Łup".
-         *
-         * Dzięki temu nie będzie już:
-         *
-         * 657657
-         */
-
-        const rows =
-            Array.from(
-                document.querySelectorAll('tr')
-            );
-
-
-        for (const row of rows) {
-
-            const cells =
-                Array.from(
-                    row.querySelectorAll(
-                        'td, th'
-                    )
-                );
-
-
-            if (cells.length < 2) {
-                continue;
-            }
-
-
-            const label =
-                normalize(
-                    cells[0].textContent
-                );
-
-
-            if (
-                label === 'łup' ||
-                label === 'lup' ||
-                label === 'zdobycz'
-            ) {
-
-                const value =
-                    cleanText(
-                        cells[1].textContent
-                    );
-
-
-                const number =
-                    numberFromText(
-                        value
-                    );
-
-
-                if (number > 0) {
-                    return number;
-                }
-            }
-        }
-
-
-        /*
-         * Drugi sposób – szukanie elementu
-         * z tekstem "Łup:".
-         */
-
-        const elements =
-            Array.from(
-                document.querySelectorAll('*')
-            );
-
-
-        for (const element of elements) {
-
-            const text =
-                cleanText(
-                    element.textContent
-                );
-
-
-            if (
-                !/^Łup:?$/i.test(text) &&
-                !/^Lup:?$/i.test(text)
-            ) {
-                continue;
-            }
-
-
-            const next =
-                element.nextElementSibling;
-
-
-            if (next) {
-
-                const number =
-                    numberFromText(
-                        next.textContent
-                    );
-
-
-                if (number > 0) {
-                    return number;
-                }
-            }
-        }
-
-
-        /*
-         * Ostateczny fallback.
-         *
-         * Ważne:
-         * bierzemy pierwszą liczbę po słowie Łup,
-         * a nie wszystkie liczby z tekstu.
-         */
-
-        const bodyText =
-            document.body.innerText || '';
-
-
-        const match =
-            bodyText.match(
-                /(?:Łup|Lup)\s*:?\s*(\d[\d\s.]*)/i
-            );
-
-
-        if (match) {
-
-            return numberFromText(
-                match[1]
-            );
-        }
-
-
-        return 0;
-    }
-
-
-    /* =========================================================
-       USZKODZENIA
-       ========================================================= */
 
     function getDamage() {
-
         const result = [];
+        const text = document.body.innerText || '';
 
-
-        const text =
-            document.body.innerText || '';
-
-
-        const wall =
-            text.match(
-                /Mur\s+(\d+)\s*[→>-]\s*(\d+)/i
-            );
-
+        const wall = text.match(
+            /Mur\s+(\d+)\s*[→>-]\s*(\d+)/i
+        );
 
         if (wall) {
-
             result.push(
                 `Mur ${wall[1]} → ${wall[2]}`
             );
         }
 
-
-        const place =
-            text.match(
-                /Plac\s+(\d+)\s*[→>-]\s*(\d+)/i
-            );
-
+        const place = text.match(
+            /Plac\s+(\d+)\s*[→>-]\s*(\d+)/i
+        );
 
         if (place) {
-
             result.push(
                 `Plac ${place[1]} → ${place[2]}`
             );
         }
 
-
         return result;
     }
 
-
-    /* =========================================================
-       REPORT EXPORT
-       ========================================================= */
-
     function getReportExport() {
 
-        /*
-         * Gotowy element exportu.
-         */
-
-        const elements =
-            Array.from(
-                document.querySelectorAll(
-                    '[name="report_export"], #report_export'
-                )
-            );
-
-
-        for (const element of elements) {
-
+        for (const el of document.querySelectorAll(
+            '[name="report_export"], #report_export'
+        )) {
             const value =
-                element.value ||
-                element.textContent ||
+                el.value ||
+                el.textContent ||
                 '';
-
 
             if (value.trim()) {
                 return value.trim();
             }
         }
 
-
-        /*
-         * Szukamy [report_export]
-         * w HTML strony.
-         */
-
         const html =
             document.documentElement.innerHTML;
 
+        const tagged = html.match(
+            /\[report_export\]([\s\S]*?)\[\/report_export\]/i
+        );
 
-        const match =
-            html.match(
-                /\[report_export\]([\s\S]*?)\[\/report_export\]/i
-            );
-
-
-        if (match) {
-            return match[1].trim();
+        if (tagged) {
+            return tagged[1].trim();
         }
 
+        const encoded =
+            html.match(/def502[a-zA-Z0-9]+/);
 
-        /*
-         * Zakodowany eksport.
-         */
-
-        const exportMatch =
-            html.match(
-                /def502[a-zA-Z0-9]+/
-            );
-
-
-        if (exportMatch) {
-            return exportMatch[0];
-        }
-
-
-        return '';
+        return encoded
+            ? encoded[0]
+            : '';
     }
-
-
-    /* =========================================================
-       TWORZENIE NOTATKI
-       ========================================================= */
 
     function makeNote(
         opponent,
-        opponentTribe,
+        tribe,
         village,
         troops,
         attackType
     ) {
-
         let note = '';
 
+        note +=
+            `[b]⚔️ RAPORT WALKI – ${attackType}[/b]\n\n`;
 
-        /* Nagłówek */
+        note += `[b]📅 DATA ATAKU[/b]\n`;
+        note += `${getAttackDate()}\n\n`;
+
+        note += `[b]♟️ PRZECIWNIK[/b]\n`;
 
         note +=
-            '[b]⚔️ RAPORT WALKI – ' +
-            attackType +
-            '[/b]\n\n';
-
-
-        /* Data */
-
-        note +=
-            '[b]📅 DATA ATAKU[/b]\n';
-
-
-        note +=
-            getAttackDate() +
-            '\n\n';
-
-
-        /* Przeciwnik */
-
-        note +=
-            '[b]♟️ PRZECIWNIK[/b]\n';
-
-
-        note +=
-            'Gracz: [player]' +
-            opponent.name +
-            '[/player]\n';
-
+            `Gracz: [player]${opponent.name}[/player]\n`;
 
         if (
-            opponentTribe &&
-            opponentTribe !==
-                'bez plemienia'
+            tribe &&
+            tribe !== 'bez plemienia'
         ) {
-
             note +=
-                'Plemię: [ally]' +
-                opponentTribe +
-                '[/ally]\n';
-
+                `Plemię: [ally]${tribe}[/ally]\n`;
         } else {
-
             note +=
-                'Plemię: bez plemienia\n';
+                `Plemię: bez plemienia\n`;
         }
-
 
         note += '\n';
 
-
-        /* Wioska */
-
-        note +=
-            '[b]🏰 WIOSKA[/b]\n';
-
+        note += `[b]🏰 WIOSKA[/b]\n`;
 
         note +=
-            'Wioska ' +
-            (
-                village.name ||
-                opponent.name
-            ) +
-            ' (' +
-            village.coords +
-            ')' +
-            (
-                village.continent
-                    ? ' ' +
-                      village.continent
-                    : ''
-            ) +
-            '\n';
+            `Wioska ${village.name || opponent.name} (${village.coords})`;
 
-
-        note +=
-            'Współrzędne: ' +
-            village.coords +
-            (
-                village.continent
-                    ? ' ' +
-                      village.continent
-                    : ''
-            ) +
-            '\n\n';
-
-
-        /* Wojsko */
-
-        note +=
-            '[b]⚔️ WOJSKO[/b]\n';
-
-
-        let anyTroops =
-            false;
-
-
-        UNITS.forEach(unit => {
-
-            const data =
-                troops[unit.key];
-
-
-            if (!data) {
-                return;
-            }
-
-
-            if (
-                data.amount > 0
-            ) {
-
-                anyTroops =
-                    true;
-
-
-                note +=
-                    '[unit]' +
-                    unit.key +
-                    '[/unit] ' +
-                    unit.name +
-                    ': ' +
-                    data.amount +
-                    '\n';
-            }
-        });
-
-
-        if (!anyTroops) {
-
-            note +=
-                'brak danych\n';
+        if (village.continent) {
+            note += ` ${village.continent}`;
         }
 
-
-        /* Straty */
+        note += '\n';
 
         note +=
-            '\n[b]💀 STRATY[/b]\n';
+            `Współrzędne: ${village.coords}`;
 
-
-        let anyLosses =
-            false;
-
-
-        UNITS.forEach(unit => {
-
-            const data =
-                troops[unit.key];
-
-
-            if (!data) {
-                return;
-            }
-
-
-            if (
-                data.losses > 0
-            ) {
-
-                anyLosses =
-                    true;
-
-
-                note +=
-                    '[unit]' +
-                    unit.key +
-                    '[/unit] ' +
-                    unit.name +
-                    ': ' +
-                    data.losses +
-                    '\n';
-            }
-        });
-
-
-        if (!anyLosses) {
-
-            note +=
-                'brak strat\n';
+        if (village.continent) {
+            note += ` ${village.continent}`;
         }
 
+        note += '\n\n';
 
-        /* Pozostało */
+        note += `[b]⚔️ WOJSKO[/b]\n`;
 
-        note +=
-            '\n[b]🛡️ POZOSTAŁO[/b]\n';
-
-
-        let anyRemaining =
-            false;
-
+        let any = false;
 
         UNITS.forEach(unit => {
+            const d = troops[unit.key];
 
-            const data =
-                troops[unit.key];
-
-
-            if (!data) {
-                return;
-            }
-
-
-            if (
-                data.remaining > 0
-            ) {
-
-                anyRemaining =
-                    true;
-
+            if (d && d.amount > 0) {
+                any = true;
 
                 note +=
-                    '[unit]' +
-                    unit.key +
-                    '[/unit] ' +
-                    unit.name +
-                    ': ' +
-                    data.remaining +
-                    '\n';
+                    `[unit]${unit.key}[/unit] ` +
+                    `${unit.name}: ${d.amount}\n`;
             }
         });
 
+        if (!any) {
+            note += 'brak danych\n';
+        }
 
-        if (!anyRemaining) {
+        note += '\n[b]💀 STRATY[/b]\n';
 
+        any = false;
+
+        UNITS.forEach(unit => {
+            const d = troops[unit.key];
+
+            if (d && d.losses > 0) {
+                any = true;
+
+                note +=
+                    `[unit]${unit.key}[/unit] ` +
+                    `${unit.name}: ${d.losses}\n`;
+            }
+        });
+
+        if (!any) {
+            note += 'brak strat\n';
+        }
+
+        note += '\n[b]🛡️ POZOSTAŁO[/b]\n';
+
+        any = false;
+
+        UNITS.forEach(unit => {
+            const d = troops[unit.key];
+
+            if (d && d.remaining > 0) {
+                any = true;
+
+                note +=
+                    `[unit]${unit.key}[/unit] ` +
+                    `${unit.name}: ${d.remaining}\n`;
+            }
+        });
+
+        if (!any) {
             note +=
                 'brak pozostałych wojsk\n';
         }
 
-
-        /* Łup */
-
-        const loot =
-            getLoot();
-
-
-        if (loot > 0) {
-
-            note +=
-                '\n[b]💰 ŁUP[/b]\n';
-
-
-            note +=
-                loot +
-                '\n';
-        }
-
-
-        /* Uszkodzenia */
-
-        const damage =
-            getDamage();
-
+        const damage = getDamage();
 
         if (damage.length) {
-
             note +=
                 '\n[b]💥 USZKODZENIA[/b]\n';
 
-
             damage.forEach(item => {
-
-                note +=
-                    item +
-                    '\n';
+                note += item + '\n';
             });
         }
 
-
-        /* Report export */
+        /*
+         * ŁUP CELOWO NIE JEST TUTAJ DODAWANY.
+         */
 
         const reportExport =
             getReportExport();
 
-
         if (reportExport) {
-
-            note += '\n';
-
-
             note +=
-                '[spoiler][report_export]';
-
-
-            note +=
-                reportExport;
-
-
-            note +=
+                '\n[spoiler][report_export]' +
+                reportExport +
                 '[/report_export][/spoiler]';
         }
-
 
         return note.trim();
     }
 
+    /*
+     * Usuwanie przypadkowo wklejonego kodu JavaScript
+     * ze starej notatki.
+     *
+     * Normalna treść notatki pozostaje.
+     */
+    function cleanOldNote(text) {
+        let result =
+            String(text || '');
 
-    /* =========================================================
-       MAŁY KOMUNIKAT
-       ========================================================= */
+        /*
+         * Usuwamy kompletne tagi script.
+         */
+        result = result.replace(
+            /<script\b[^>]*>[\s\S]*?<\/script>/gi,
+            ''
+        );
+
+        /*
+         * Usuwamy javascript:
+         */
+        result = result.replace(
+            /javascript\s*:/gi,
+            ''
+        );
+
+        /*
+         * Usuwamy przypadkowo wklejony blok:
+         *
+         * $(function(){
+         * ...
+         * CosmeticNameExecutor.start();
+         * });
+         */
+        result = result.replace(
+            /\$\s*\(\s*function\s*\(\s*\)\s*\{[\s\S]*?CosmeticNameExecutor\.start\(\)\s*;\s*\}\s*\)\s*;?/gi,
+            ''
+        );
+
+        /*
+         * Drugi wariant jQuery.
+         */
+        result = result.replace(
+            /\$\s*\(\s*document\s*\)\s*\.ready\s*\(\s*function\s*\(\s*\)\s*\{[\s\S]*?\}\s*\)\s*;?/gi,
+            ''
+        );
+
+        /*
+         * Charakterystyczne fragmenty kodu Plemion.
+         */
+        const suspicious = [
+            /^\s*Timing\.init\b.*$/gim,
+            /^\s*WorldSwitch\.init\b.*$/gim,
+            /^\s*WorldSwitch\.worldsURL\b.*$/gim,
+            /^\s*HotKeys\.init\b.*$/gim,
+            /^\s*Connection\.connect\b.*$/gim,
+            /^\s*DialogQueue\.consume\b.*$/gim,
+            /^\s*GiftCalendar\.setNewLabel\b.*$/gim,
+            /^\s*CosmeticNameExecutor\.start\b.*$/gim
+        ];
+
+        suspicious.forEach(re => {
+            result = result.replace(re, '');
+        });
+
+        return result
+            .replace(/\n{4,}/g, '\n\n')
+            .trim();
+    }
 
     function showToast(
         message,
         success = true
     ) {
-
         const old =
             document.getElementById(
                 'galowie_report_toast'
             );
 
-
         if (old) {
             old.remove();
         }
 
-
         const toast =
-            document.createElement(
-                'div'
-            );
-
+            document.createElement('div');
 
         toast.id =
             'galowie_report_toast';
 
-
         toast.style.cssText = `
-
             position:fixed;
-
             top:20px;
-
             right:20px;
-
             z-index:999999;
-
             max-width:420px;
-
             padding:14px 18px;
-
             border-radius:8px;
-
             font-family:Arial,sans-serif;
-
             font-size:15px;
-
             font-weight:bold;
-
-            box-shadow:
-                0 4px 18px
-                rgba(0,0,0,.35);
-
+            box-shadow:0 4px 18px rgba(0,0,0,.35);
             ${
                 success
-                    ? `
-                        background:#d9f2d9;
-                        border:1px solid #65a765;
-                        color:#205520;
-                      `
-                    : `
-                        background:#f4dcdc;
-                        border:1px solid #d77;
-                        color:#7a2222;
-                      `
+                ? 'background:#d9f2d9;border:1px solid #65a765;color:#205520;'
+                : 'background:#f4dcdc;border:1px solid #d77;color:#7a2222;'
             }
-
         `;
-
 
         toast.innerHTML =
             message;
-
 
         document.body.appendChild(
             toast
         );
 
-
         setTimeout(() => {
+            toast.style.transition =
+                'opacity .4s';
 
             toast.style.opacity =
                 '0';
 
-            toast.style.transition =
-                'opacity .4s';
-
-
-            setTimeout(() => {
-
-                toast.remove();
-
-            }, 450);
+            setTimeout(
+                () => toast.remove(),
+                450
+            );
 
         }, 4000);
     }
-
-
-    /* =========================================================
-       AUTOMATYCZNY ZAPIS
-       ========================================================= */
 
     async function saveNoteToEnemyVillage(
         villageId,
         note
     ) {
-
         if (!villageId) {
-
             return {
-
                 saved: false,
-
                 error:
                     'Brak ID wioski przeciwnika.'
-
             };
         }
 
-
-        const gameData =
-            getGameData();
-
-
         const currentVillageId =
-            gameData.village
-                ? gameData.village.id
+            gameData().village
+                ? gameData().village.id
                 : '';
-
 
         let url =
             '/game.php?screen=info_village&id=' +
-            encodeURIComponent(
-                villageId
-            );
-
+            encodeURIComponent(villageId);
 
         if (currentVillageId) {
-
             url +=
                 '&village=' +
                 encodeURIComponent(
@@ -1738,218 +744,151 @@
                 );
         }
 
-
-        /*
-         * Otwieramy prawdziwą stronę wioski
-         * w nowej karcie.
-         */
-
         const win =
             window.open(
                 url,
                 '_blank'
             );
 
-
         if (!win) {
-
             return {
-
                 saved: false,
-
                 error:
                     'Przeglądarka zablokowała nową kartę. Zezwól na wyskakujące okna dla Plemion.'
-
             };
         }
 
-
         return new Promise(resolve => {
 
-            let attempts =
-                0;
-
-            let finished =
-                false;
-
+            let attempts = 0;
+            let finished = false;
 
             function finish(
                 saved,
-                error
+                error = ''
             ) {
+                if (finished) return;
 
-                if (finished) {
-                    return;
-                }
-
-
-                finished =
-                    true;
-
-
-                /*
-                 * Zamykamy kartę pomocniczą.
-                 */
+                finished = true;
 
                 setTimeout(() => {
-
                     try {
                         win.close();
                     } catch (e) {}
-
                 }, 1200);
 
-
                 resolve({
-
-                    saved:
-                        saved,
-
-                    error:
-                        error || ''
-
+                    saved,
+                    error
                 });
             }
 
-
             function trySave() {
+                if (finished) return;
 
                 attempts++;
 
-
-                if (finished) {
-                    return;
-                }
-
-
                 try {
 
-                    if (
-                        win.closed
-                    ) {
-
+                    if (win.closed) {
                         finish(
                             false,
                             'Karta wioski została zamknięta.'
                         );
-
                         return;
                     }
 
-
                     const doc =
                         win.document;
-
 
                     if (
                         !doc ||
                         !doc.body
                     ) {
-
                         if (
-                            attempts >=
-                            50
+                            attempts >= 50
                         ) {
-
                             finish(
                                 false,
                                 'Nie udało się załadować wioski.'
                             );
-
                             return;
                         }
-
 
                         setTimeout(
                             trySave,
                             300
                         );
 
-
                         return;
                     }
-
-
-                    /*
-                     * PRAWDZIWE POLE PLEMION
-                     */
 
                     const textarea =
                         doc.querySelector(
                             'textarea[name="note"]'
                         );
 
-
                     if (!textarea) {
 
                         if (
-                            attempts >=
-                            50
+                            attempts >= 50
                         ) {
-
                             finish(
                                 false,
-                                'Nie znaleziono pola textarea[name="note"].'
+                                'Nie znaleziono pola notatki.'
                             );
-
                             return;
                         }
-
 
                         setTimeout(
                             trySave,
                             300
                         );
 
-
                         return;
                     }
 
+                    /*
+                     * Pobieramy starą notatkę.
+                     */
+                    const oldNote =
+                        cleanOldNote(
+                            textarea.value || ''
+                        );
 
                     /*
-                     * Istniejąca notatka.
+                     * Stara notatka zostaje,
+                     * nowy raport jest dopisywany.
                      */
-
-                    const oldNote =
-                        textarea.value ||
-                        '';
-
-
                     let finalNote =
                         note;
 
-
-                    /*
-                     * Dopisujemy raport,
-                     * nie usuwamy starej notatki.
-                     */
-
-                    if (
-                        oldNote.trim()
-                    ) {
-
+                    if (oldNote) {
                         finalNote =
-                            oldNote.trim() +
+                            oldNote +
                             '\n\n' +
                             note;
                     }
 
-
                     /*
-                     * Wstawiamy treść.
+                     * Ostateczne zabezpieczenie.
                      */
+                    finalNote =
+                        finalNote
+                            .replace(
+                                /<script\b[^>]*>[\s\S]*?<\/script>/gi,
+                                ''
+                            )
+                            .replace(
+                                /javascript\s*:/gi,
+                                ''
+                            )
+                            .trim();
 
                     textarea.focus();
 
-
                     textarea.value =
                         finalNote;
-
-
-                    /*
-                     * Informujemy Plemiona,
-                     * że wartość pola się zmieniła.
-                     */
 
                     textarea.dispatchEvent(
                         new Event(
@@ -1960,7 +899,6 @@
                         )
                     );
 
-
                     textarea.dispatchEvent(
                         new Event(
                             'change',
@@ -1970,70 +908,54 @@
                         )
                     );
 
-
-                    /*
-                     * PRAWDZIWY PRZYCISK ZAPISU
-                     */
-
                     const saveButton =
                         doc.querySelector(
                             '#note_submit_button'
                         );
 
-
                     if (!saveButton) {
 
                         if (
-                            attempts >=
-                            50
+                            attempts >= 50
                         ) {
-
                             finish(
                                 false,
-                                'Nie znaleziono przycisku #note_submit_button.'
+                                'Nie znaleziono przycisku zapisu notatki.'
                             );
-
                             return;
                         }
-
 
                         setTimeout(
                             trySave,
                             300
                         );
 
-
                         return;
                     }
 
-
                     /*
-                     * Klikamy natywny zapis Plemion.
+                     * Prawdziwy przycisk zapisu
+                     * notatki Plemion.
                      */
-
                     saveButton.click();
 
-
                     /*
-                     * Czekamy na AJAX.
+                     * Dajemy AJAX-owi czas
+                     * na zapisanie notatki.
                      */
-
-                    setTimeout(() => {
-
-                        finish(
+                    setTimeout(
+                        () => finish(
                             true,
                             ''
-                        );
-
-                    }, 1600);
+                        ),
+                        1600
+                    );
 
                 } catch (error) {
 
                     if (
-                        attempts >=
-                        50
+                        attempts >= 50
                     ) {
-
                         finish(
                             false,
                             'Błąd automatycznego zapisu: ' +
@@ -2043,7 +965,6 @@
                         return;
                     }
 
-
                     setTimeout(
                         trySave,
                         300
@@ -2051,25 +972,14 @@
                 }
             }
 
-
-            /*
-             * Pierwsza próba.
-             */
-
             setTimeout(
                 trySave,
                 600
             );
 
-
-            /*
-             * Maksymalny czas.
-             */
-
             setTimeout(() => {
 
                 if (!finished) {
-
                     finish(
                         false,
                         'Przekroczono czas oczekiwania na zapis.'
@@ -2077,38 +987,21 @@
                 }
 
             }, 18000);
-
         });
     }
 
-
-    /* =========================================================
-       GŁÓWNA ANALIZA
-       ========================================================= */
-
     async function analyze() {
 
-        /*
-         * Raport musi być stroną raportu.
-         */
-
         const attackerSide =
-            findSide(
-                'Agresor:'
-            );
-
+            findSide('Agresor:');
 
         const defenderSide =
-            findSide(
-                'Obrońca:'
-            );
-
+            findSide('Obrońca:');
 
         if (
             !attackerSide ||
             !defenderSide
         ) {
-
             showToast(
                 '❌ Nie znaleziono danych raportu. Uruchom skrypt na stronie raportu.',
                 false
@@ -2117,67 +1010,46 @@
             return;
         }
 
-
-        /* Gracze */
-
         const attacker =
             extractPlayer(
                 attackerSide
             );
-
 
         const defender =
             extractPlayer(
                 defenderSide
             );
 
-
-        /* Wioski */
-
         const attackerVillage =
             extractVillage(
                 attackerSide
             );
-
 
         const defenderVillage =
             extractVillage(
                 defenderSide
             );
 
-
-        /* Plemiona */
-
         const attackerTribe =
             await getPlayerTribe(
                 attacker.id
             );
-
 
         const defenderTribe =
             await getPlayerTribe(
                 defender.id
             );
 
-
-        /* Zmienne przeciwnika */
-
         let opponent;
-
         let opponentTribe;
-
         let opponentVillage;
-
         let opponentSide;
-
         let attackType;
 
-
-        /* =====================================================
-           GAL → PRZECIWNIK
-           OBRONA
-           ===================================================== */
-
+        /*
+         * Galowie atakują przeciwnika.
+         * Dla przeciwnika zapisujemy OBRONĘ.
+         */
         if (
             isGal(attackerTribe) &&
             !isGal(defenderTribe)
@@ -2197,15 +1069,12 @@
 
             attackType =
                 'OBRONA';
-        }
 
-
-        /* =====================================================
-           PRZECIWNIK → GAL
-           ATAK
-           ===================================================== */
-
-        else if (
+        /*
+         * Przeciwnik atakuje Galów.
+         * Dla przeciwnika zapisujemy ATAK.
+         */
+        } else if (
             !isGal(attackerTribe) &&
             isGal(defenderTribe)
         ) {
@@ -2224,14 +1093,11 @@
 
             attackType =
                 'ATAK';
-        }
 
-
-        /* =====================================================
-           GAL → GAL
-           ===================================================== */
-
-        else if (
+        /*
+         * Galowie kontra Galowie.
+         */
+        } else if (
             isGal(attackerTribe) &&
             isGal(defenderTribe)
         ) {
@@ -2242,14 +1108,11 @@
             );
 
             return;
-        }
 
-
-        /* =====================================================
-           OBI → OBI
-           ===================================================== */
-
-        else {
+        /*
+         * Obcy kontra obcy.
+         */
+        } else {
 
             showToast(
                 '⛔ Żadna ze stron nie należy do Galów — pominięto raport.',
@@ -2259,61 +1122,38 @@
             return;
         }
 
-
         /*
-         * Pobieramy wojsko WYŁĄCZNIE przeciwnika.
+         * Czytamy wyłącznie wojsko przeciwnika.
          */
-
         const troops =
             readTroops(
                 opponentSide
             );
 
-
-        /*
-         * Tworzymy notatkę.
-         */
-
         const note =
             makeNote(
-
                 opponent,
-
                 opponentTribe,
-
                 opponentVillage,
-
                 troops,
-
                 attackType
-
             );
-
 
         /*
          * Automatyczny zapis.
          */
-
         const saveResult =
             await saveNoteToEnemyVillage(
-
                 opponentVillage.id,
-
                 note
-
             );
-
-
-        /*
-         * Komunikat.
-         */
 
         if (
             saveResult.saved
         ) {
 
             showToast(
-                '🟢 <b>Notatka zapisana automatycznie.</b><br>' +
+                '🟢 <b>Notatka dodana do wioski.</b><br>' +
                 escapeHtml(
                     opponent.name
                 ) +
@@ -2333,11 +1173,9 @@
         }
     }
 
-
-    /* =========================================================
-       START
-       ========================================================= */
-
+    /*
+     * START
+     */
     analyze();
 
 })();
